@@ -1177,7 +1177,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svcs     []*Service
-		eps      map[string]k8s.EpsOrSlices
+		eps      map[string]*Endpoints
 
 		c1ExpectedResult map[string]string
 		c2ExpectedResult map[string]string
@@ -1200,34 +1200,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Ingress:       statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
-				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+			eps: map[string]*Endpoints{
+				"10.20.30.1": *Endpoints{
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris1"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1261,34 +1243,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
-				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+			eps: map[string]*Endpoints{
+				"10.20.30.1": *Endpoints{
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris1"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1321,34 +1285,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
-				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+			eps: map[string]*Endpoints{
+				"10.20.30.1": *Endpoints{
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1382,34 +1328,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
-				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+			eps: map[string]*Endpoints{
+				"10.20.30.1": *Endpoints{
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1443,34 +1371,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
-				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+			eps: map[string]*Endpoints{
+				"10.20.30.1": *Endpoints{
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+					},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1511,65 +1423,29 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.35",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.35",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1612,65 +1488,31 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.35",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris1"),
+						},
+					},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.35",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1713,65 +1555,33 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris2"),
+						},
+					},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris1"),
 						},
 					},
 					Type: k8s.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.35",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris1"),
+						},
+					},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.35",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1807,49 +1617,20 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
 						},
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
+						},
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1883,45 +1664,20 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
+						},
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris1"),
 						},
 					},
 					Type: k8s.Slices,
@@ -1955,45 +1711,22 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
+						},
+					},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,
@@ -2027,45 +1760,22 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
+						},
+					},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris1"),
 						},
 					},
 					Type: k8s.Slices,
@@ -2099,45 +1809,22 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]*Endpoints{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
-									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
-									},
-								},
-							},
+					Ready: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.5",
+							NodeName: strptr("iris1"),
+						},
+					},
+					NotReady: []Endpoint{
+						Endpoint{
+							IP:       "2.3.4.15",
+							NodeName: strptr("iris2"),
+						},
+						Endpoint{
+							IP:       "2.3.4.25",
+							NodeName: strptr("iris2"),
 						},
 					},
 					Type: k8s.Slices,

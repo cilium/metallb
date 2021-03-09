@@ -25,7 +25,6 @@ import (
 
 	"go.universe.tf/metallb/pkg/bgp"
 	"go.universe.tf/metallb/pkg/config"
-	"go.universe.tf/metallb/pkg/k8s"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -86,46 +85,21 @@ newPeers:
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
 // It only checks nodes matching the given filterNode function.
-func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool {
+func hasHealthyEndpoint(eps *Endpoints, filterNode func(*string) bool) bool {
 	ready := map[string]bool{}
-	switch eps.Type {
-	case k8s.Eps:
-		for _, subset := range eps.EpVal.Subsets {
-			for _, ep := range subset.Addresses {
-				if filterNode(ep.NodeName) {
-					continue
-				}
-				if _, ok := ready[ep.IP]; !ok {
-					// Only set true if nothing else has expressed an
-					// opinion. This means that false will take precedence
-					// if there's any unready ports for a given endpoint.
-					ready[ep.IP] = true
-				}
-			}
-			for _, ep := range subset.NotReadyAddresses {
-				ready[ep.IP] = false
-			}
+	for _, ep := range eps.Ready {
+		if filterNode(ep.NodeName) {
+			continue
 		}
-	case k8s.Slices:
-		for _, slice := range eps.SlicesVal {
-			for _, ep := range slice.Endpoints {
-				node := ep.Topology["kubernetes.io/hostname"]
-				if filterNode(&node) {
-					continue
-				}
-				for _, addr := range ep.Addresses {
-					if _, ok := ready[addr]; !ok && k8s.IsConditionReady(ep.Conditions) {
-						// Only set true if nothing else has expressed an
-						// opinion. This means that false will take precedence
-						// if there's any unready ports for a given endpoint.
-						ready[addr] = true
-					}
-					if !k8s.IsConditionReady(ep.Conditions) {
-						ready[addr] = false
-					}
-				}
-			}
+		if _, ok := ready[ep.IP]; !ok {
+			// Only set true if nothing else has expressed an
+			// opinion. This means that false will take precedence
+			// if there's any unready ports for a given endpoint.
+			ready[ep.IP] = true
 		}
+	}
+	for _, ep := range eps.NotReady {
+		ready[ep.IP] = false
 	}
 
 	for _, r := range ready {
@@ -137,7 +111,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 	return false
 }
 
-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps k8s.EpsOrSlices) string {
+func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *Endpoints) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
