@@ -137,7 +137,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 	return false
 }
 
-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps k8s.EpsOrSlices) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
@@ -150,7 +150,7 @@ func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Servic
 		return false
 	}
 
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(eps, filterNode) {
+	if v1.ServiceExternalTrafficPolicyType(policyType) == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(eps, filterNode) {
 		return "noLocalEndpoints"
 	} else if !hasHealthyEndpoint(eps, func(toFilter *string) bool { return false }) {
 		return "noEndpoints"

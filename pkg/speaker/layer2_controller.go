@@ -93,7 +93,7 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps k8s.EpsOrSlices) string {
 	nodes := usableNodes(eps, c.SList.UsableSpeakers())
 	// Sort the slice by the hash of node + service name. This
 	// produces an ordering of ready nodes that is unique to this
