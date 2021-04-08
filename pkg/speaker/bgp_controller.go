@@ -227,11 +227,11 @@ func (c *BGPController) updateAds() error {
 		// and detecting conflicting advertisements.
 		allAds = append(allAds, ads...)
 	}
-	for _, peer := range c.peers {
-		if peer.bgp == nil {
+	for _, session := range c.PeerSessions() {
+		if session == nil {
 			continue
 		}
-		if err := peer.bgp.Set(allAds...); err != nil {
+		if err := session.Set(allAds...); err != nil {
 			return err
 		}
 	}
@@ -264,6 +264,15 @@ func (c *BGPController) SetNodeLabels(l log.Logger, lbls map[string]string) erro
 	c.nodeLabels = ns
 	l.Log("event", "nodeLabelsChanged", "msg", "Node labels changed, resyncing BGP peers")
 	return c.syncPeers(l)
+}
+
+// PeerSessions returns the underlying BGP sessions for direct use.
+func (c *BGPController) PeerSessions() []Session {
+	s := make([]Session, len(c.peers))
+	for i, peer := range c.peers {
+		s[i] = peer.bgp
+	}
+	return s
 }
 
 var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (Session, error) {
