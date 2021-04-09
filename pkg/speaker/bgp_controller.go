@@ -34,7 +34,7 @@ import (
 
 type peer struct {
 	cfg *config.Peer
-	bgp session
+	bgp Session
 }
 
 type BGPController struct {
@@ -246,7 +246,8 @@ func (c *BGPController) DeleteBalancer(l log.Logger, name, reason string) error 
 	return c.updateAds()
 }
 
-type session interface {
+// Session gives access to the BGP session.
+type Session interface {
 	io.Closer
 	Set(advs ...*bgp.Advertisement) error
 }
@@ -265,6 +266,6 @@ func (c *BGPController) SetNodeLabels(l log.Logger, lbls map[string]string) erro
 	return c.syncPeers(l)
 }
 
-var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (session, error) {
+var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (Session, error) {
 	return bgp.New(logger, addr, myASN, routerID, asn, hold, password, myNode)
 }
