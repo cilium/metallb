@@ -16,6 +16,7 @@ package controller
 
 import (
 	"reflect"
+	"sync/atomic"
 
 	"go.universe.tf/metallb/pkg/allocator"
 	"go.universe.tf/metallb/pkg/config"
@@ -30,7 +31,7 @@ type Controller struct {
 	Client service
 	IPs    *allocator.Allocator
 
-	synced bool
+	synced uint32
 	config *config.Config
 }
 
@@ -103,7 +104,7 @@ func (c *Controller) SetConfig(l log.Logger, cfg *config.Config) types.SyncState
 }
 
 func (c *Controller) MarkSynced(l log.Logger) {
-	c.synced = true
+	atomic.StoreUint32(&c.synced, 1)
 	l.Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
 }
 
