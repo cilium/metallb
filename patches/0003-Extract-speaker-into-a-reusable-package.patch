@@ -1,20 +1,20 @@
-From b832cfe60dd80341091a7b9ea6cebfc460de81c7 Mon Sep 17 00:00:00 2001
+From d4529534351195b9e53b371aefae99b4e38e4a4b Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Thu, 4 Mar 2021 15:30:50 -0800
 Subject: [PATCH 03/10] Extract speaker into a reusable package
 
 Signed-off-by: Chris Tarazi <chris@isovalent.com>
 ---
- .../speaker}/bgp_controller.go                |  42 +--
- .../speaker}/bgp_controller_test.go           |   4 +-
- .../speaker}/layer2_controller.go             |  34 +--
+ .../speaker}/bgp_controller.go                |  40 +--
+ .../speaker}/bgp_controller_test.go           |   2 +-
+ .../speaker}/layer2_controller.go             |  32 +--
  .../speaker}/layer2_controller_test.go        |   2 +-
  internal/speaker/speaker.go                   | 266 ++++++++++++++++++
  speaker/main.go                               | 262 +----------------
- 6 files changed, 310 insertions(+), 300 deletions(-)
+ 6 files changed, 307 insertions(+), 297 deletions(-)
  rename {speaker => internal/speaker}/bgp_controller.go (88%)
  rename {speaker => internal/speaker}/bgp_controller_test.go (99%)
- rename {speaker => internal/speaker}/layer2_controller.go (76%)
+ rename {speaker => internal/speaker}/layer2_controller.go (81%)
  rename {speaker => internal/speaker}/layer2_controller_test.go (99%)
  create mode 100644 internal/speaker/speaker.go
 
@@ -22,7 +22,7 @@ diff --git a/speaker/bgp_controller.go b/internal/speaker/bgp_controller.go
 similarity index 88%
 rename from speaker/bgp_controller.go
 rename to internal/speaker/bgp_controller.go
-index 67deb88f..f09d1e2b 100644
+index b4e9771f..d506afaf 100644
 --- a/speaker/bgp_controller.go
 +++ b/internal/speaker/bgp_controller.go
 @@ -12,7 +12,7 @@
@@ -34,16 +34,7 @@ index 67deb88f..f09d1e2b 100644
  
  import (
  	"fmt"
-@@ -25,7 +25,7 @@ import (
- 
- 	"go.universe.tf/metallb/internal/bgp"
- 	"go.universe.tf/metallb/internal/config"
--	"k8s.io/api/core/v1"
-+	v1 "k8s.io/api/core/v1"
- 	"k8s.io/apimachinery/pkg/labels"
- 
- 	"github.com/go-kit/kit/log"
-@@ -36,15 +36,15 @@ type peer struct {
+@@ -37,15 +37,15 @@ type peer struct {
  	bgp session
  }
  
@@ -64,23 +55,24 @@ index 67deb88f..f09d1e2b 100644
  	newPeers := make([]*peer, 0, len(cfg.Peers))
  newPeers:
  	for _, p := range cfg.Peers {
-@@ -136,13 +136,13 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
+@@ -136,14 +136,14 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
  	return false
  }
  
--func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
-+func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
++func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
  	// Should we advertise?
  	// Yes, if externalTrafficPolicy is
  	//  Cluster && any healthy endpoint exists
  	// or
  	//  Local && there's a ready local endpoint.
--	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.myNode) {
-+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
- 		return "noLocalEndpoints"
- 	} else if !healthyEndpointExists(eps) {
- 		return "noEndpoints"
-@@ -152,7 +152,7 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Servic
+ 	filterNode := func(toFilter *string) bool {
+-		if toFilter == nil || *toFilter != c.myNode {
++		if toFilter == nil || *toFilter != c.MyNode {
+ 			return true
+ 		}
+ 		return false
+@@ -159,7 +159,7 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Servic
  
  // Called when either the peer list or node labels have changed,
  // implying that the set of running BGP sessions may need tweaking.
@@ -89,7 +81,7 @@ index 67deb88f..f09d1e2b 100644
  	var (
  		errs          int
  		needUpdateAds bool
-@@ -184,7 +184,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
+@@ -191,7 +191,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
  			if p.cfg.RouterID != nil {
  				routerID = p.cfg.RouterID
  			}
@@ -98,7 +90,7 @@ index 67deb88f..f09d1e2b 100644
  			if err != nil {
  				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
  				errs++
-@@ -207,8 +207,8 @@ func (c *bgpController) syncPeers(l log.Logger) error {
+@@ -214,8 +214,8 @@ func (c *bgpController) syncPeers(l log.Logger) error {
  	return nil
  }
  
@@ -109,7 +101,7 @@ index 67deb88f..f09d1e2b 100644
  	for _, adCfg := range pool.BGPAdvertisements {
  		m := net.CIDRMask(adCfg.AggregationLength, 32)
  		ad := &bgp.Advertisement{
-@@ -222,21 +222,21 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
+@@ -229,21 +229,21 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
  			ad.Communities = append(ad.Communities, comm)
  		}
  		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
@@ -135,7 +127,7 @@ index 67deb88f..f09d1e2b 100644
  		// This list might contain duplicates, but that's fine,
  		// they'll get compacted by the session code when it's
  		// calculating advertisements.
-@@ -256,11 +256,11 @@ func (c *bgpController) updateAds() error {
+@@ -263,11 +263,11 @@ func (c *bgpController) updateAds() error {
  	return nil
  }
  
@@ -150,7 +142,7 @@ index 67deb88f..f09d1e2b 100644
  	return c.updateAds()
  }
  
-@@ -269,7 +269,7 @@ type session interface {
+@@ -276,7 +276,7 @@ type session interface {
  	Set(advs ...*bgp.Advertisement) error
  }
  
@@ -163,7 +155,7 @@ diff --git a/speaker/bgp_controller_test.go b/internal/speaker/bgp_controller_te
 similarity index 99%
 rename from speaker/bgp_controller_test.go
 rename to internal/speaker/bgp_controller_test.go
-index 05d20fd5..3ca6a5e5 100644
+index 00693499..601a8367 100644
 --- a/speaker/bgp_controller_test.go
 +++ b/internal/speaker/bgp_controller_test.go
 @@ -1,4 +1,4 @@
@@ -172,20 +164,11 @@ index 05d20fd5..3ca6a5e5 100644
  
  import (
  	"errors"
-@@ -15,7 +15,7 @@ import (
- 
- 	"github.com/go-kit/kit/log"
- 	"github.com/google/go-cmp/cmp"
--	"k8s.io/api/core/v1"
-+	v1 "k8s.io/api/core/v1"
- 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
- 	"k8s.io/apimachinery/pkg/labels"
- )
 diff --git a/speaker/layer2_controller.go b/internal/speaker/layer2_controller.go
-similarity index 76%
+similarity index 81%
 rename from speaker/layer2_controller.go
 rename to internal/speaker/layer2_controller.go
-index 83e3e101..ab0a2fd6 100644
+index 110d8736..bd2c05d2 100644
 --- a/speaker/layer2_controller.go
 +++ b/internal/speaker/layer2_controller.go
 @@ -12,7 +12,7 @@
@@ -197,12 +180,8 @@ index 83e3e101..ab0a2fd6 100644
  
  import (
  	"bytes"
-@@ -23,16 +23,16 @@ import (
- 	"github.com/go-kit/kit/log"
- 	"go.universe.tf/metallb/internal/config"
- 	"go.universe.tf/metallb/internal/layer2"
--	"k8s.io/api/core/v1"
-+	v1 "k8s.io/api/core/v1"
+@@ -27,13 +27,13 @@ import (
+ 	v1 "k8s.io/api/core/v1"
  )
  
 -type layer2Controller struct {
@@ -220,18 +199,18 @@ index 83e3e101..ab0a2fd6 100644
  	return nil
  }
  
-@@ -69,8 +69,8 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
+@@ -93,8 +93,8 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
  	return ret
  }
  
--func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
 -	nodes := usableNodes(eps, c.sList.UsableSpeakers())
-+func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
++func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
 +	nodes := usableNodes(eps, c.SList.UsableSpeakers())
  	// Sort the slice by the hash of node + service name. This
  	// produces an ordering of ready nodes that is unique to this
  	// service.
-@@ -82,7 +82,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
+@@ -106,7 +106,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
  	})
  
  	// Are we first in the list? If so, we win and should announce.
@@ -240,7 +219,7 @@ index 83e3e101..ab0a2fd6 100644
  		return ""
  	}
  
-@@ -90,20 +90,20 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
+@@ -114,20 +114,20 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
  	return "notOwner"
  }
  
@@ -272,7 +251,7 @@ diff --git a/speaker/layer2_controller_test.go b/internal/speaker/layer2_control
 similarity index 99%
 rename from speaker/layer2_controller_test.go
 rename to internal/speaker/layer2_controller_test.go
-index 48e3acf5..d94dfcdf 100644
+index 616aceb9..680fd8c0 100644
 --- a/speaker/layer2_controller_test.go
 +++ b/internal/speaker/layer2_controller_test.go
 @@ -1,4 +1,4 @@
@@ -283,7 +262,7 @@ index 48e3acf5..d94dfcdf 100644
  	"net"
 diff --git a/internal/speaker/speaker.go b/internal/speaker/speaker.go
 new file mode 100644
-index 00000000..97fd0735
+index 00000000..05127efc
 --- /dev/null
 +++ b/internal/speaker/speaker.go
 @@ -0,0 +1,266 @@
@@ -355,7 +334,7 @@ index 00000000..97fd0735
 +	DisableLayer2 bool
 +}
 +
-+func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
++func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) k8s.SyncState {
 +	if svc == nil {
 +		return c.deleteBalancer(l, name, "serviceDeleted")
 +	}
@@ -519,7 +498,7 @@ index 00000000..97fd0735
 +// A Protocol can advertise an IP address.
 +type Protocol interface {
 +	SetConfig(gokitlog.Logger, *config.Config) error
-+	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
++	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, k8s.EpsOrSlices) string
 +	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
 +	DeleteBalancer(gokitlog.Logger, string, string) error
 +	SetNode(gokitlog.Logger, *v1.Node) error
@@ -554,13 +533,13 @@ index 00000000..97fd0735
 +	prometheus.MustRegister(announcing)
 +}
 diff --git a/speaker/main.go b/speaker/main.go
-index 8f343d73..f92a44d6 100644
+index a7e5f984..8a632cf4 100644
 --- a/speaker/main.go
 +++ b/speaker/main.go
-@@ -17,46 +17,18 @@ package main
- import (
+@@ -18,46 +18,18 @@ import (
  	"flag"
  	"fmt"
+ 	"io/ioutil"
 -	"net"
  	"os"
  	"os/signal"
@@ -605,7 +584,7 @@ index 8f343d73..f92a44d6 100644
  	logger, err := logging.Init()
  	if err != nil {
  		fmt.Printf("failed to initialize logging: %s\n", err)
-@@ -102,7 +74,7 @@ func main() {
+@@ -111,7 +83,7 @@ func main() {
  	}
  
  	// Setup all clients and speakers, config decides what is being done runtime.
@@ -614,7 +593,7 @@ index 8f343d73..f92a44d6 100644
  		MyNode: *myNode,
  		Logger: logger,
  		SList:  sList,
-@@ -132,7 +104,7 @@ func main() {
+@@ -141,7 +113,7 @@ func main() {
  		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
  		os.Exit(1)
  	}
@@ -623,7 +602,7 @@ index 8f343d73..f92a44d6 100644
  
  	sList.Start(client)
  	defer sList.Stop()
-@@ -141,231 +113,3 @@ func main() {
+@@ -150,231 +122,3 @@ func main() {
  		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
  	}
  }
@@ -680,7 +659,7 @@ index 8f343d73..f92a44d6 100644
 -	return ret, nil
 -}
 -
--func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
+-func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) k8s.SyncState {
 -	if svc == nil {
 -		return c.deleteBalancer(l, name, "serviceDeleted")
 -	}
@@ -844,7 +823,7 @@ index 8f343d73..f92a44d6 100644
 -// A Protocol can advertise an IP address.
 -type Protocol interface {
 -	SetConfig(gokitlog.Logger, *config.Config) error
--	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
+-	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, k8s.EpsOrSlices) string
 -	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
 -	DeleteBalancer(gokitlog.Logger, string, string) error
 -	SetNode(gokitlog.Logger, *v1.Node) error

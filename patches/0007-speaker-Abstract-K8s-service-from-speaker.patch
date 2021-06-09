@@ -1,4 +1,4 @@
-From c9318794f963b4b24db7a18e46dbab53c46b4113 Mon Sep 17 00:00:00 2001
+From e652c820ec76797c5b6c43fa23a58dacdf4736e1 Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Mon, 8 Mar 2021 17:34:56 -0800
 Subject: [PATCH 07/10] speaker: Abstract K8s service from speaker
@@ -25,10 +25,10 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
  3 files changed, 35 insertions(+), 22 deletions(-)
 
 diff --git a/pkg/speaker/bgp_controller_test.go b/pkg/speaker/bgp_controller_test.go
-index a96255b2..0b3a7248 100644
+index c35900b4..587f059e 100644
 --- a/pkg/speaker/bgp_controller_test.go
 +++ b/pkg/speaker/bgp_controller_test.go
-@@ -40,14 +40,10 @@ func ipnet(s string) *net.IPNet {
+@@ -41,14 +41,10 @@ func ipnet(s string) *net.IPNet {
  	return n
  }
  
@@ -48,19 +48,19 @@ index a96255b2..0b3a7248 100644
  	}
  }
 diff --git a/pkg/speaker/layer2_controller_test.go b/pkg/speaker/layer2_controller_test.go
-index 3d290039..8d31227c 100644
+index 2409e94d..35c1c600 100644
 --- a/pkg/speaker/layer2_controller_test.go
 +++ b/pkg/speaker/layer2_controller_test.go
-@@ -169,7 +169,7 @@ func TestShouldAnnounce(t *testing.T) {
+@@ -1176,7 +1176,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  
  		balancer string
  		config   *config.Config
 -		svcs     []*v1.Service
 +		svcs     []*Service
- 		eps      map[string]*v1.Endpoints
+ 		eps      map[string]k8s.EpsOrSlices
  
  		c1ExpectedResult map[string]string
-@@ -186,13 +186,11 @@ func TestShouldAnnounce(t *testing.T) {
+@@ -1193,13 +1193,11 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					},
  				},
  			},
@@ -78,12 +78,12 @@ index 3d290039..8d31227c 100644
 +					Ingress:       statusAssigned("10.20.30.1"),
  				},
  			},
- 			eps: map[string]*v1.Endpoints{
+ 			eps: map[string]k8s.EpsOrSlices{
 diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
-index 62f80a26..5c06ab15 100644
+index 0cd4a647..cd5c0891 100644
 --- a/pkg/speaker/speaker.go
 +++ b/pkg/speaker/speaker.go
-@@ -66,12 +66,32 @@ type ControllerConfig struct {
+@@ -67,12 +67,32 @@ type ControllerConfig struct {
  	DisableLayer2 bool
  }
  
@@ -95,7 +95,7 @@ index 62f80a26..5c06ab15 100644
 +	Ingress       []v1.LoadBalancerIngress
 +}
 +
- func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) types.SyncState {
+ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) types.SyncState {
 +	s := c.SetService(l, name, &Service{
 +		Type:          string(svc.Spec.Type),
 +		TrafficPolicy: string(svc.Spec.ExternalTrafficPolicy),
@@ -107,7 +107,7 @@ index 62f80a26..5c06ab15 100644
 +	return s
 +}
 +
-+func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *v1.Endpoints) types.SyncState {
++func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps k8s.EpsOrSlices) types.SyncState {
  	if svc == nil {
  		return c.deleteBalancer(l, name, "serviceDeleted")
  	}
@@ -117,7 +117,7 @@ index 62f80a26..5c06ab15 100644
  		return c.deleteBalancer(l, name, "notLoadBalancer")
  	}
  
-@@ -83,13 +103,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -84,13 +104,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  		return types.SyncStateSuccess
  	}
  
@@ -134,7 +134,7 @@ index 62f80a26..5c06ab15 100644
  		return c.deleteBalancer(l, name, "invalidIP")
  	}
  
-@@ -127,7 +147,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -128,7 +148,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  		return c.deleteBalancer(l, name, "internalError")
  	}
  
@@ -143,7 +143,7 @@ index 62f80a26..5c06ab15 100644
  		return c.deleteBalancer(l, name, deleteReason)
  	}
  
-@@ -148,7 +168,6 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -149,7 +169,6 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  		"ip":       lbIP.String(),
  	}).Set(1)
  	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")

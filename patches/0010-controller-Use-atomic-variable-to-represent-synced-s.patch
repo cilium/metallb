@@ -1,4 +1,4 @@
-From 40d425d20241cb4aa511d195dc6a410fc77c2dde Mon Sep 17 00:00:00 2001
+From 9b32e46b894e32143366c0825892a6aa0d151ece Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Mon, 17 May 2021 11:53:35 -0700
 Subject: [PATCH 10/10] controller: Use atomic variable to represent synced
@@ -21,7 +21,7 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
  2 files changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/pkg/controller/controller.go b/pkg/controller/controller.go
-index 4796d5a8..6fca933c 100644
+index a025c515..aaef4d1d 100644
 --- a/pkg/controller/controller.go
 +++ b/pkg/controller/controller.go
 @@ -16,6 +16,7 @@ package controller
@@ -32,7 +32,7 @@ index 4796d5a8..6fca933c 100644
  
  	"go.universe.tf/metallb/pkg/allocator"
  	"go.universe.tf/metallb/pkg/config"
-@@ -29,7 +30,7 @@ type Controller struct {
+@@ -30,7 +31,7 @@ type Controller struct {
  	Client service
  	IPs    *allocator.Allocator
  
@@ -41,7 +41,7 @@ index 4796d5a8..6fca933c 100644
  	config *config.Config
  }
  
-@@ -102,7 +103,7 @@ func (c *Controller) SetConfig(l log.Logger, cfg *config.Config) types.SyncState
+@@ -103,7 +104,7 @@ func (c *Controller) SetConfig(l log.Logger, cfg *config.Config) types.SyncState
  }
  
  func (c *Controller) MarkSynced(l log.Logger) {

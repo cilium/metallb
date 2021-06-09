@@ -1,4 +1,4 @@
-From a3d7f1e5b4d43bf23231feda38a9d08c0d150cc1 Mon Sep 17 00:00:00 2001
+From e6f6609bb0166e1df9a45765cde9270fbff406ea Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Wed, 3 Mar 2021 15:06:54 -0800
 Subject: [PATCH 05/10] Rename internal/* to pkg/*
@@ -24,9 +24,10 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
  {internal => pkg}/bgp/testdata/open-4               | Bin
  {internal => pkg}/config/config.go                  |   2 +-
  {internal => pkg}/config/config_test.go             |   0
- {internal => pkg}/controller/controller.go          |   6 +++---
+ {internal => pkg}/controller/controller.go          |   8 ++++----
  {internal => pkg}/controller/controller_test.go     |   6 +++---
  {internal => pkg}/controller/service.go             |   2 +-
+ {internal => pkg}/k8s/endpoint_slices.go            |   0
  {internal => pkg}/k8s/k8s.go                        |   6 +++---
  {internal => pkg}/k8s/stats.go                      |   0
  {internal => pkg}/k8s/types/types.go                |   2 +-
@@ -37,17 +38,17 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
  {internal => pkg}/layer2/ndp.go                     |   0
  {internal => pkg}/layer2/stats.go                   |   0
  {internal => pkg}/logging/logging.go                |   0
- {internal => pkg}/speaker/bgp_controller.go         |   5 +++--
+ {internal => pkg}/speaker/bgp_controller.go         |   7 ++++---
  {internal => pkg}/speaker/bgp_controller_test.go    |   6 +++---
- {internal => pkg}/speaker/layer2_controller.go      |   4 ++--
+ {internal => pkg}/speaker/layer2_controller.go      |   6 +++---
  {internal => pkg}/speaker/layer2_controller_test.go |   4 ++--
- {internal => pkg}/speaker/speaker.go                |   8 ++++----
+ {internal => pkg}/speaker/speaker.go                |  10 +++++-----
  {internal => pkg}/speakerlist/speakerlist.go        |   2 +-
  {internal => pkg}/version/version.go                |   0
  speaker/main.go                                     |  10 +++++-----
  tasks.py                                            |   4 ++--
- 39 files changed, 44 insertions(+), 43 deletions(-)
- rename {internal => pkg}/allocator/allocator.go (99%)
+ 40 files changed, 48 insertions(+), 47 deletions(-)
+ rename {internal => pkg}/allocator/allocator.go (98%)
  rename {internal => pkg}/allocator/allocator_test.go (99%)
  rename {internal => pkg}/allocator/k8salloc/k8salloc.go (95%)
  rename {internal => pkg}/allocator/stats.go (100%)
@@ -63,10 +64,11 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
  rename {internal => pkg}/bgp/testdata/open-4 (100%)
  rename {internal => pkg}/config/config.go (99%)
  rename {internal => pkg}/config/config_test.go (100%)
- rename {internal => pkg}/controller/controller.go (96%)
+ rename {internal => pkg}/controller/controller.go (95%)
  rename {internal => pkg}/controller/controller_test.go (99%)
  rename {internal => pkg}/controller/service.go (99%)
- rename {internal => pkg}/k8s/k8s.go (98%)
+ rename {internal => pkg}/k8s/endpoint_slices.go (100%)
+ rename {internal => pkg}/k8s/k8s.go (99%)
  rename {internal => pkg}/k8s/stats.go (100%)
  rename {internal => pkg}/k8s/types/types.go (84%)
  rename {internal => pkg}/layer2/announcer.go (100%)
@@ -78,18 +80,18 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
  rename {internal => pkg}/logging/logging.go (100%)
  rename {internal => pkg}/speaker/bgp_controller.go (98%)
  rename {internal => pkg}/speaker/bgp_controller_test.go (99%)
- rename {internal => pkg}/speaker/layer2_controller.go (97%)
+ rename {internal => pkg}/speaker/layer2_controller.go (96%)
  rename {internal => pkg}/speaker/layer2_controller_test.go (99%)
  rename {internal => pkg}/speaker/speaker.go (97%)
  rename {internal => pkg}/speakerlist/speakerlist.go (99%)
  rename {internal => pkg}/version/version.go (100%)
 
 diff --git a/controller/main.go b/controller/main.go
-index da15ef18..2b879359 100644
+index 65194cdf..c61ea1db 100644
 --- a/controller/main.go
 +++ b/controller/main.go
-@@ -19,11 +19,11 @@ import (
- 	"fmt"
+@@ -20,11 +20,11 @@ import (
+ 	"io/ioutil"
  	"os"
  
 -	"go.universe.tf/metallb/internal/allocator"
@@ -106,10 +108,10 @@ index da15ef18..2b879359 100644
  
  func main() {
 diff --git a/internal/allocator/allocator.go b/pkg/allocator/allocator.go
-similarity index 99%
+similarity index 98%
 rename from internal/allocator/allocator.go
 rename to pkg/allocator/allocator.go
-index 474cfdc4..f76aa457 100644
+index 85697115..cfa775c7 100644
 --- a/internal/allocator/allocator.go
 +++ b/pkg/allocator/allocator.go
 @@ -1,4 +1,4 @@
@@ -171,7 +173,7 @@ diff --git a/internal/bgp/bgp.go b/pkg/bgp/bgp.go
 similarity index 99%
 rename from internal/bgp/bgp.go
 rename to pkg/bgp/bgp.go
-index 842dccd5..c00d2ca3 100644
+index e1142a34..acc3b523 100644
 --- a/internal/bgp/bgp.go
 +++ b/pkg/bgp/bgp.go
 @@ -1,4 +1,4 @@
@@ -216,7 +218,7 @@ diff --git a/internal/config/config.go b/pkg/config/config.go
 similarity index 99%
 rename from internal/config/config.go
 rename to pkg/config/config.go
-index 866f8229..9257088d 100644
+index 09f55796..07621053 100644
 --- a/internal/config/config.go
 +++ b/pkg/config/config.go
 @@ -12,7 +12,7 @@
@@ -233,21 +235,23 @@ similarity index 100%
 rename from internal/config/config_test.go
 rename to pkg/config/config_test.go
 diff --git a/internal/controller/controller.go b/pkg/controller/controller.go
-similarity index 96%
+similarity index 95%
 rename from internal/controller/controller.go
 rename to pkg/controller/controller.go
-index 84afcd61..4796d5a8 100644
+index 72e1d5a8..a025c515 100644
 --- a/internal/controller/controller.go
 +++ b/pkg/controller/controller.go
-@@ -17,9 +17,9 @@ package controller
+@@ -17,10 +17,10 @@ package controller
  import (
  	"reflect"
  
 -	"go.universe.tf/metallb/internal/allocator"
 -	"go.universe.tf/metallb/internal/config"
+-	"go.universe.tf/metallb/internal/k8s"
 -	"go.universe.tf/metallb/internal/k8s/types"
 +	"go.universe.tf/metallb/pkg/allocator"
 +	"go.universe.tf/metallb/pkg/config"
++	"go.universe.tf/metallb/pkg/k8s"
 +	"go.universe.tf/metallb/pkg/k8s/types"
  
  	"github.com/go-kit/kit/log"
@@ -256,7 +260,7 @@ diff --git a/internal/controller/controller_test.go b/pkg/controller/controller_
 similarity index 99%
 rename from internal/controller/controller_test.go
 rename to pkg/controller/controller_test.go
-index 0ce10621..0a96efb1 100644
+index f4711485..9bbd9e04 100644
 --- a/internal/controller/controller_test.go
 +++ b/pkg/controller/controller_test.go
 @@ -20,9 +20,9 @@ import (
@@ -288,11 +292,15 @@ index 8998a932..459411d2 100644
  )
  
  func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
+diff --git a/internal/k8s/endpoint_slices.go b/pkg/k8s/endpoint_slices.go
+similarity index 100%
+rename from internal/k8s/endpoint_slices.go
+rename to pkg/k8s/endpoint_slices.go
 diff --git a/internal/k8s/k8s.go b/pkg/k8s/k8s.go
-similarity index 98%
+similarity index 99%
 rename from internal/k8s/k8s.go
 rename to pkg/k8s/k8s.go
-index 6b236ac2..261a0355 100644
+index 82cd60b2..8ccd66ec 100644
 --- a/internal/k8s/k8s.go
 +++ b/pkg/k8s/k8s.go
 @@ -1,4 +1,4 @@
@@ -301,9 +309,9 @@ index 6b236ac2..261a0355 100644
  
  import (
  	"context"
-@@ -7,8 +7,8 @@ import (
- 	"io/ioutil"
+@@ -9,8 +9,8 @@ import (
  	"net/http"
+ 	"time"
  
 -	"go.universe.tf/metallb/internal/config"
 -	"go.universe.tf/metallb/internal/k8s/types"
@@ -361,17 +369,19 @@ diff --git a/internal/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
 similarity index 98%
 rename from internal/speaker/bgp_controller.go
 rename to pkg/speaker/bgp_controller.go
-index f09d1e2b..dc789991 100644
+index d506afaf..e3023819 100644
 --- a/internal/speaker/bgp_controller.go
 +++ b/pkg/speaker/bgp_controller.go
-@@ -23,8 +23,9 @@ import (
+@@ -23,9 +23,10 @@ import (
  	"strconv"
  	"time"
  
 -	"go.universe.tf/metallb/internal/bgp"
 -	"go.universe.tf/metallb/internal/config"
+-	"go.universe.tf/metallb/internal/k8s"
 +	"go.universe.tf/metallb/pkg/bgp"
 +	"go.universe.tf/metallb/pkg/config"
++	"go.universe.tf/metallb/pkg/k8s"
 +
  	v1 "k8s.io/api/core/v1"
  	"k8s.io/apimachinery/pkg/labels"
@@ -380,7 +390,7 @@ diff --git a/internal/speaker/bgp_controller_test.go b/pkg/speaker/bgp_controlle
 similarity index 99%
 rename from internal/speaker/bgp_controller_test.go
 rename to pkg/speaker/bgp_controller_test.go
-index 3ca6a5e5..a96255b2 100644
+index 601a8367..c35900b4 100644
 --- a/internal/speaker/bgp_controller_test.go
 +++ b/pkg/speaker/bgp_controller_test.go
 @@ -9,9 +9,9 @@ import (
@@ -397,19 +407,21 @@ index 3ca6a5e5..a96255b2 100644
  	"github.com/go-kit/kit/log"
  	"github.com/google/go-cmp/cmp"
 diff --git a/internal/speaker/layer2_controller.go b/pkg/speaker/layer2_controller.go
-similarity index 97%
+similarity index 96%
 rename from internal/speaker/layer2_controller.go
 rename to pkg/speaker/layer2_controller.go
-index ab0a2fd6..a69ec512 100644
+index bd2c05d2..0424c8ba 100644
 --- a/internal/speaker/layer2_controller.go
 +++ b/pkg/speaker/layer2_controller.go
-@@ -21,8 +21,8 @@ import (
+@@ -21,9 +21,9 @@ import (
  	"sort"
  
  	"github.com/go-kit/kit/log"
 -	"go.universe.tf/metallb/internal/config"
+-	"go.universe.tf/metallb/internal/k8s"
 -	"go.universe.tf/metallb/internal/layer2"
 +	"go.universe.tf/metallb/pkg/config"
++	"go.universe.tf/metallb/pkg/k8s"
 +	"go.universe.tf/metallb/pkg/layer2"
  	v1 "k8s.io/api/core/v1"
  )
@@ -418,7 +430,7 @@ diff --git a/internal/speaker/layer2_controller_test.go b/pkg/speaker/layer2_con
 similarity index 99%
 rename from internal/speaker/layer2_controller_test.go
 rename to pkg/speaker/layer2_controller_test.go
-index d94dfcdf..3d290039 100644
+index 680fd8c0..2409e94d 100644
 --- a/internal/speaker/layer2_controller_test.go
 +++ b/pkg/speaker/layer2_controller_test.go
 @@ -6,8 +6,8 @@ import (
@@ -436,19 +448,21 @@ diff --git a/internal/speaker/speaker.go b/pkg/speaker/speaker.go
 similarity index 97%
 rename from internal/speaker/speaker.go
 rename to pkg/speaker/speaker.go
-index 10265675..1e39032c 100644
+index 6d1cc795..42a0961c 100644
 --- a/internal/speaker/speaker.go
 +++ b/pkg/speaker/speaker.go
-@@ -4,10 +4,10 @@ import (
+@@ -4,11 +4,11 @@ import (
  	"fmt"
  	"net"
  
 -	"go.universe.tf/metallb/internal/bgp"
 -	"go.universe.tf/metallb/internal/config"
+-	"go.universe.tf/metallb/internal/k8s"
 -	"go.universe.tf/metallb/internal/k8s/types"
 -	"go.universe.tf/metallb/internal/layer2"
 +	"go.universe.tf/metallb/pkg/bgp"
 +	"go.universe.tf/metallb/pkg/config"
++	"go.universe.tf/metallb/pkg/k8s"
 +	"go.universe.tf/metallb/pkg/k8s/types"
 +	"go.universe.tf/metallb/pkg/layer2"
  
@@ -458,7 +472,7 @@ diff --git a/internal/speakerlist/speakerlist.go b/pkg/speakerlist/speakerlist.g
 similarity index 99%
 rename from internal/speakerlist/speakerlist.go
 rename to pkg/speakerlist/speakerlist.go
-index 7d60ad01..fc942c69 100644
+index 12d02e77..a062e879 100644
 --- a/internal/speakerlist/speakerlist.go
 +++ b/pkg/speakerlist/speakerlist.go
 @@ -19,7 +19,7 @@ import (
@@ -475,10 +489,10 @@ similarity index 100%
 rename from internal/version/version.go
 rename to pkg/version/version.go
 diff --git a/speaker/main.go b/speaker/main.go
-index f92a44d6..74a658fa 100644
+index 8a632cf4..d90bc8e4 100644
 --- a/speaker/main.go
 +++ b/speaker/main.go
-@@ -21,11 +21,11 @@ import (
+@@ -22,11 +22,11 @@ import (
  	"os/signal"
  	"syscall"
  
@@ -496,10 +510,10 @@ index f92a44d6..74a658fa 100644
  
  func main() {
 diff --git a/tasks.py b/tasks.py
-index 412ed028..bb3e8c98 100644
+index ce8584d8..5d4a9639 100644
 --- a/tasks.py
 +++ b/tasks.py
-@@ -87,8 +87,8 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
+@@ -89,8 +89,8 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
          }
          for bin in binaries:
              run("go build -v -o build/{arch}/{bin}/{bin} -ldflags "

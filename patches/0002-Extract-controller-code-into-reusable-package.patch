@@ -1,4 +1,4 @@
-From a2831b13c7ac31516230a276e6f882f20ef539d1 Mon Sep 17 00:00:00 2001
+From 73990c0901fb74f9edab4f2e6c44cf413b2c27ea Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Tue, 2 Mar 2021 19:15:49 -0800
 Subject: [PATCH 02/10] Extract controller code into reusable package
@@ -7,20 +7,20 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
 ---
  controller/main.go                            |  99 +--------------
  internal/controller/controller.go             | 114 ++++++++++++++++++
- .../controller}/controller_test.go            |  18 ++-
+ .../controller}/controller_test.go            |  16 ++-
  .../controller}/service.go                    |  30 ++---
- 4 files changed, 149 insertions(+), 112 deletions(-)
+ 4 files changed, 148 insertions(+), 111 deletions(-)
  create mode 100644 internal/controller/controller.go
  rename {controller => internal/controller}/controller_test.go (96%)
  rename {controller => internal/controller}/service.go (87%)
 
 diff --git a/controller/main.go b/controller/main.go
-index 865c6d47..da15ef18 100644
+index 4466c532..65194cdf 100644
 --- a/controller/main.go
 +++ b/controller/main.go
-@@ -18,105 +18,14 @@ import (
- 	"flag"
+@@ -19,105 +19,14 @@ import (
  	"fmt"
+ 	"io/ioutil"
  	"os"
 -	"reflect"
  
@@ -32,7 +32,7 @@ index 865c6d47..da15ef18 100644
  	"go.universe.tf/metallb/internal/version"
 -
 -	"github.com/go-kit/kit/log"
--	"k8s.io/api/core/v1"
+-	v1 "k8s.io/api/core/v1"
  )
  
 -// Service offers methods to mutate a Kubernetes service object.
@@ -49,7 +49,7 @@ index 865c6d47..da15ef18 100644
 -	ips    *allocator.Allocator
 -}
 -
--func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
+-func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ k8s.EpsOrSlices) k8s.SyncState {
 -	l.Log("event", "startUpdate", "msg", "start of service update")
 -	defer l.Log("event", "endUpdate", "msg", "end of service update")
 -
@@ -125,9 +125,9 @@ index 865c6d47..da15ef18 100644
  func main() {
  	logger, err := logging.Init()
  	if err != nil {
-@@ -134,8 +43,8 @@ func main() {
- 
- 	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "msg", "MetalLB controller starting "+version.String())
+@@ -146,8 +55,8 @@ func main() {
+ 		*namespace = string(bs)
+ 	}
  
 -	c := &controller{
 -		ips: allocator.New(),
@@ -136,8 +136,8 @@ index 865c6d47..da15ef18 100644
  	}
  
  	client, err := k8s.New(&k8s.Config{
-@@ -155,7 +64,7 @@ func main() {
- 		os.Exit(1)
+@@ -175,7 +84,7 @@ func main() {
+ 		}
  	}
  
 -	c.client = client
@@ -147,7 +147,7 @@ index 865c6d47..da15ef18 100644
  	}
 diff --git a/internal/controller/controller.go b/internal/controller/controller.go
 new file mode 100644
-index 00000000..efecb812
+index 00000000..e1818908
 --- /dev/null
 +++ b/internal/controller/controller.go
 @@ -0,0 +1,114 @@
@@ -186,7 +186,7 @@ index 00000000..efecb812
 +	config *config.Config
 +}
 +
-+func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
++func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ k8s.EpsOrSlices) k8s.SyncState {
 +	l.Log("event", "startUpdate", "msg", "start of service update")
 +	defer l.Log("event", "endUpdate", "msg", "end of service update")
 +
@@ -269,7 +269,7 @@ diff --git a/controller/controller_test.go b/internal/controller/controller_test
 similarity index 96%
 rename from controller/controller_test.go
 rename to internal/controller/controller_test.go
-index c699f9f4..0ce10621 100644
+index f3a99b7c..f4711485 100644
 --- a/controller/controller_test.go
 +++ b/internal/controller/controller_test.go
 @@ -1,4 +1,18 @@
@@ -292,15 +292,6 @@ index c699f9f4..0ce10621 100644
  
  import (
  	"fmt"
-@@ -12,7 +26,7 @@ import (
- 
- 	"github.com/go-kit/kit/log"
- 	"github.com/google/go-cmp/cmp"
--	"k8s.io/api/core/v1"
-+	v1 "k8s.io/api/core/v1"
- 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
- )
- 
 diff --git a/controller/service.go b/internal/controller/service.go
 similarity index 87%
 rename from controller/service.go

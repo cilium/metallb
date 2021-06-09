@@ -1,4 +1,4 @@
-From 0257a8e5d51de10450c733abd822caa4f2d6e87b Mon Sep 17 00:00:00 2001
+From 47e1d7e1a7e590c2660a6c58df7b20453cf985b4 Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Fri, 12 Mar 2021 17:28:11 -0800
 Subject: [PATCH 04/10] Extract specific k8s package types to separate package
@@ -10,36 +10,35 @@ because they likely already have a K8s client implementation.
 
 Signed-off-by: Chris Tarazi <chris@isovalent.com>
 ---
- internal/controller/controller.go | 24 +++++++-------
+ internal/controller/controller.go | 23 ++++++-------
  internal/k8s/k8s.go               | 55 ++++++++++++-------------------
  internal/k8s/types/types.go       | 15 +++++++++
- internal/speaker/speaker.go       | 38 ++++++++++-----------
- 4 files changed, 67 insertions(+), 65 deletions(-)
+ internal/speaker/speaker.go       | 37 +++++++++++----------
+ 4 files changed, 67 insertions(+), 63 deletions(-)
  create mode 100644 internal/k8s/types/types.go
 
 diff --git a/internal/controller/controller.go b/internal/controller/controller.go
-index efecb812..84afcd61 100644
+index e1818908..72e1d5a8 100644
 --- a/internal/controller/controller.go
 +++ b/internal/controller/controller.go
-@@ -19,7 +19,7 @@ import (
- 
+@@ -20,6 +20,7 @@ import (
  	"go.universe.tf/metallb/internal/allocator"
  	"go.universe.tf/metallb/internal/config"
--	"go.universe.tf/metallb/internal/k8s"
+ 	"go.universe.tf/metallb/internal/k8s"
 +	"go.universe.tf/metallb/internal/k8s/types"
  
  	"github.com/go-kit/kit/log"
  	v1 "k8s.io/api/core/v1"
-@@ -33,7 +33,7 @@ type Controller struct {
+@@ -33,7 +34,7 @@ type Controller struct {
  	config *config.Config
  }
  
--func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
-+func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) types.SyncState {
+-func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ k8s.EpsOrSlices) k8s.SyncState {
++func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ k8s.EpsOrSlices) types.SyncState {
  	l.Log("event", "startUpdate", "msg", "start of service update")
  	defer l.Log("event", "endUpdate", "msg", "end of service update")
  
-@@ -42,13 +42,13 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
+@@ -42,13 +43,13 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
  		// There might be other LBs stuck waiting for an IP, so when
  		// we delete a balancer we should reprocess all of them to
  		// check for newly feasible balancers.
@@ -55,7 +54,7 @@ index efecb812..84afcd61 100644
  	}
  
  	// Making a copy unconditionally is a bit wasteful, since we don't
-@@ -57,11 +57,11 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
+@@ -57,11 +58,11 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
  	// a reason.
  	svc := svcRo.DeepCopy()
  	if !c.convergeBalancer(l, name, svc) {
@@ -69,7 +68,7 @@ index efecb812..84afcd61 100644
  	}
  
  	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
-@@ -70,12 +70,12 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
+@@ -70,12 +71,12 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
  		svc.Status = st
  		if err := c.Client.UpdateStatus(svc); err != nil {
  			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
@@ -84,7 +83,7 @@ index efecb812..84afcd61 100644
  }
  
  func (c *Controller) deleteBalancer(l log.Logger, name string) {
-@@ -84,21 +84,21 @@ func (c *Controller) deleteBalancer(l log.Logger, name string) {
+@@ -84,21 +85,21 @@ func (c *Controller) deleteBalancer(l log.Logger, name string) {
  	}
  }
  
@@ -111,30 +110,25 @@ index efecb812..84afcd61 100644
  
  func (c *Controller) MarkSynced(l log.Logger) {
 diff --git a/internal/k8s/k8s.go b/internal/k8s/k8s.go
-index 67d9a917..6b236ac2 100644
+index 3d5edc70..82cd60b2 100644
 --- a/internal/k8s/k8s.go
 +++ b/internal/k8s/k8s.go
-@@ -8,10 +8,11 @@ import (
- 	"net/http"
+@@ -10,6 +10,7 @@ import (
+ 	"time"
  
  	"go.universe.tf/metallb/internal/config"
 +	"go.universe.tf/metallb/internal/k8s/types"
  
  	"github.com/go-kit/kit/log"
  	"github.com/prometheus/client_golang/prometheus/promhttp"
--	"k8s.io/api/core/v1"
-+	v1 "k8s.io/api/core/v1"
- 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
- 	"k8s.io/apimachinery/pkg/fields"
- 	"k8s.io/client-go/kubernetes"
-@@ -44,26 +45,12 @@ type Client struct {
+@@ -49,26 +50,12 @@ type Client struct {
  
  	syncFuncs []cache.InformerSynced
  
--	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+-	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 -	configChanged  func(log.Logger, *config.Config) SyncState
 -	nodeChanged    func(log.Logger, *v1.Node) SyncState
-+	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) types.SyncState
++	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) types.SyncState
 +	configChanged  func(log.Logger, *config.Config) types.SyncState
 +	nodeChanged    func(log.Logger, *v1.Node) types.SyncState
  	synced         func(log.Logger)
@@ -157,20 +151,20 @@ index 67d9a917..6b236ac2 100644
  // Config specifies the configuration of the Kubernetes
  // client/watcher.
  type Config struct {
-@@ -77,9 +64,9 @@ type Config struct {
+@@ -82,9 +69,9 @@ type Config struct {
  	Logger        log.Logger
  	Kubeconfig    string
  
--	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+-	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 -	ConfigChanged  func(log.Logger, *config.Config) SyncState
 -	NodeChanged    func(log.Logger, *v1.Node) SyncState
-+	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) types.SyncState
++	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) types.SyncState
 +	ConfigChanged  func(log.Logger, *config.Config) types.SyncState
 +	NodeChanged    func(log.Logger, *v1.Node) types.SyncState
  	Synced         func(log.Logger)
  }
  
-@@ -310,12 +297,12 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
+@@ -419,12 +406,12 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
  		updates.Inc()
  		st := c.sync(key)
  		switch st {
@@ -186,7 +180,7 @@ index 67d9a917..6b236ac2 100644
  			c.queue.Forget(key)
  			c.ForceSync()
  		}
-@@ -348,7 +335,7 @@ func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{})
+@@ -457,7 +444,7 @@ func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{})
  	c.events.Eventf(svc, v1.EventTypeWarning, kind, msg, args...)
  }
  
@@ -195,7 +189,7 @@ index 67d9a917..6b236ac2 100644
  	defer c.queue.Done(key)
  
  	switch k := key.(type) {
-@@ -357,7 +344,7 @@ func (c *Client) sync(key interface{}) SyncState {
+@@ -466,7 +453,7 @@ func (c *Client) sync(key interface{}) SyncState {
  		svc, exists, err := c.svcIndexer.GetByKey(string(k))
  		if err != nil {
  			l.Log("op", "getService", "error", err, "msg", "failed to get service")
@@ -203,8 +197,8 @@ index 67d9a917..6b236ac2 100644
 +			return types.SyncStateError
  		}
  		if !exists {
- 			return c.serviceChanged(l, string(k), nil, nil)
-@@ -368,7 +355,7 @@ func (c *Client) sync(key interface{}) SyncState {
+ 			return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
+@@ -477,7 +464,7 @@ func (c *Client) sync(key interface{}) SyncState {
  			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
  			if err != nil {
  				l.Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
@@ -212,8 +206,17 @@ index 67d9a917..6b236ac2 100644
 +				return types.SyncStateError
  			}
  			if !exists {
- 				return c.serviceChanged(l, string(k), nil, nil)
-@@ -383,7 +370,7 @@ func (c *Client) sync(key interface{}) SyncState {
+ 				return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
+@@ -491,7 +478,7 @@ func (c *Client) sync(key interface{}) SyncState {
+ 			slicesIntf, err := c.slicesIndexer.ByIndex(slicesServiceIndexName, string(k))
+ 			if err != nil {
+ 				l.Log("op", "getEndpointSlices", "error", err, "msg", "failed to get endpoints slices")
+-				return SyncStateError
++				return types.SyncStateError
+ 			}
+ 			if len(slicesIntf) == 0 {
+ 				return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
+@@ -513,7 +500,7 @@ func (c *Client) sync(key interface{}) SyncState {
  		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
  		if err != nil {
  			l.Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
@@ -222,7 +225,7 @@ index 67d9a917..6b236ac2 100644
  		}
  		if !exists {
  			configStale.Set(1)
-@@ -399,14 +386,14 @@ func (c *Client) sync(key interface{}) SyncState {
+@@ -529,14 +516,14 @@ func (c *Client) sync(key interface{}) SyncState {
  		if err != nil {
  			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
  			configStale.Set(1)
@@ -240,7 +243,7 @@ index 67d9a917..6b236ac2 100644
  		}
  
  		configLoaded.Set(1)
-@@ -420,11 +407,11 @@ func (c *Client) sync(key interface{}) SyncState {
+@@ -550,11 +537,11 @@ func (c *Client) sync(key interface{}) SyncState {
  		n, exists, err := c.nodeIndexer.GetByKey(string(k))
  		if err != nil {
  			l.Log("op", "getNode", "error", err, "msg", "failed to get node")
@@ -254,7 +257,7 @@ index 67d9a917..6b236ac2 100644
  		}
  		node := n.(*v1.Node)
  		return c.nodeChanged(c.logger, node)
-@@ -433,7 +420,7 @@ func (c *Client) sync(key interface{}) SyncState {
+@@ -563,7 +550,7 @@ func (c *Client) sync(key interface{}) SyncState {
  		if c.synced != nil {
  			c.synced(c.logger)
  		}
@@ -285,28 +288,27 @@ index 00000000..263eb6b1
 +	SyncStateReprocessAll
 +)
 diff --git a/internal/speaker/speaker.go b/internal/speaker/speaker.go
-index 97fd0735..10265675 100644
+index 05127efc..6d1cc795 100644
 --- a/internal/speaker/speaker.go
 +++ b/internal/speaker/speaker.go
-@@ -6,7 +6,7 @@ import (
- 
+@@ -7,6 +7,7 @@ import (
  	"go.universe.tf/metallb/internal/bgp"
  	"go.universe.tf/metallb/internal/config"
--	"go.universe.tf/metallb/internal/k8s"
+ 	"go.universe.tf/metallb/internal/k8s"
 +	"go.universe.tf/metallb/internal/k8s/types"
  	"go.universe.tf/metallb/internal/layer2"
  
  	gokitlog "github.com/go-kit/kit/log"
-@@ -66,7 +66,7 @@ type ControllerConfig struct {
+@@ -66,7 +67,7 @@ type ControllerConfig struct {
  	DisableLayer2 bool
  }
  
--func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
-+func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) types.SyncState {
+-func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) k8s.SyncState {
++func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) types.SyncState {
  	if svc == nil {
  		return c.deleteBalancer(l, name, "serviceDeleted")
  	}
-@@ -80,7 +80,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -80,7 +81,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  
  	if c.config == nil {
  		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
@@ -315,7 +317,7 @@ index 97fd0735..10265675 100644
  	}
  
  	if len(svc.Status.LoadBalancer.Ingress) != 1 {
-@@ -109,13 +109,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -109,13 +110,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  	}
  
  	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
@@ -331,7 +333,7 @@ index 97fd0735..10265675 100644
  			return st
  		}
  	}
-@@ -133,7 +133,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -133,7 +134,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  
  	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
  		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
@@ -340,7 +342,7 @@ index 97fd0735..10265675 100644
  	}
  
  	if c.announced[name] == "" {
-@@ -150,18 +150,18 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -150,18 +151,18 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
  	c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
  
@@ -363,7 +365,7 @@ index 97fd0735..10265675 100644
  	}
  
  	announcing.Delete(prometheus.Labels{
-@@ -175,7 +175,7 @@ func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.
+@@ -175,7 +176,7 @@ func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.
  
  	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
  
@@ -372,7 +374,7 @@ index 97fd0735..10265675 100644
  }
  
  func poolFor(pools map[string]*config.Pool, ip net.IP) string {
-@@ -189,42 +189,42 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
+@@ -189,42 +190,42 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
  	return ""
  }
  

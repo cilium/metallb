@@ -1,4 +1,4 @@
-From ebad36be82c23ec7aac5464e214b59c9ce3d491d Mon Sep 17 00:00:00 2001
+From 73e5e65e52cba89aed4873a758703b90dd74069e Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Mon, 8 Mar 2021 21:49:59 -0800
 Subject: [PATCH 08/10] speaker: Abstract K8s endpoints from speaker
@@ -7,72 +7,71 @@ Similar to the previous commit, but this time for v1.Endpoints.
 
 Signed-off-by: Chris Tarazi <chris@isovalent.com>
 ---
- pkg/speaker/bgp_controller.go         |  50 ++-
- pkg/speaker/layer2_controller.go      |  24 +-
- pkg/speaker/layer2_controller_test.go | 426 +++++++++++---------------
- pkg/speaker/speaker.go                |  39 ++-
- 4 files changed, 251 insertions(+), 288 deletions(-)
+ pkg/speaker/bgp_controller.go         |  52 +-
+ pkg/speaker/layer2_controller.go      |  48 +-
+ pkg/speaker/layer2_controller_test.go | 673 +++++++-------------------
+ pkg/speaker/speaker.go                |  58 ++-
+ 4 files changed, 259 insertions(+), 572 deletions(-)
 
 diff --git a/pkg/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
-index 11f94fa7..b16622bb 100644
+index 960c5daa..0da1d4af 100644
 --- a/pkg/speaker/bgp_controller.go
 +++ b/pkg/speaker/bgp_controller.go
-@@ -84,24 +84,22 @@ newPeers:
- }
+@@ -25,7 +25,6 @@ import (
  
- // nodeHasHealthyEndpoint return true if this node has at least one healthy endpoint.
--func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
-+func nodeHasHealthyEndpoint(eps *Endpoints, node string) bool {
+ 	"go.universe.tf/metallb/pkg/bgp"
+ 	"go.universe.tf/metallb/pkg/config"
+-	"go.universe.tf/metallb/pkg/k8s"
+ 
+ 	v1 "k8s.io/api/core/v1"
+ 	"k8s.io/apimachinery/pkg/labels"
+@@ -86,47 +85,22 @@ newPeers:
+ 
+ // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
+ // It only checks nodes matching the given filterNode function.
+-func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool {
++func hasHealthyEndpoint(eps *Endpoints, filterNode func(*string) bool) bool {
  	ready := map[string]bool{}
--	for _, subset := range eps.Subsets {
--		for _, ep := range subset.Addresses {
--			if ep.NodeName == nil || *ep.NodeName != node {
--				continue
+-	switch eps.Type {
+-	case k8s.Eps:
+-		for _, subset := range eps.EpVal.Subsets {
+-			for _, ep := range subset.Addresses {
+-				if filterNode(ep.NodeName) {
+-					continue
+-				}
+-				if _, ok := ready[ep.IP]; !ok {
+-					// Only set true if nothing else has expressed an
+-					// opinion. This means that false will take precedence
+-					// if there's any unready ports for a given endpoint.
+-					ready[ep.IP] = true
+-				}
 -			}
--			if _, ok := ready[ep.IP]; !ok {
--				// Only set true if nothing else has expressed an
--				// opinion. This means that false will take precedence
--				// if there's any unready ports for a given endpoint.
--				ready[ep.IP] = true
+-			for _, ep := range subset.NotReadyAddresses {
+-				ready[ep.IP] = false
 -			}
 +	for _, ep := range eps.Ready {
-+		if ep.NodeName == nil || *ep.NodeName != node {
++		if filterNode(ep.NodeName) {
 +			continue
  		}
--		for _, ep := range subset.NotReadyAddresses {
--			ready[ep.IP] = false
-+		if _, ok := ready[ep.IP]; !ok {
-+			// Only set true if nothing else has expressed an
-+			// opinion. This means that false will take precedence
-+			// if there's any unready ports for a given endpoint.
-+			ready[ep.IP] = true
- 		}
- 	}
-+	for _, ep := range eps.NotReady {
-+		ready[ep.IP] = false
-+	}
- 
- 	for _, r := range ready {
- 		if r {
-@@ -112,21 +110,19 @@ func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
- 	return false
- }
- 
--func healthyEndpointExists(eps *v1.Endpoints) bool {
-+func healthyEndpointExists(eps *Endpoints) bool {
- 	ready := map[string]bool{}
--	for _, subset := range eps.Subsets {
--		for _, ep := range subset.Addresses {
--			if _, ok := ready[ep.IP]; !ok {
--				// Only set true if nothing else has expressed an
--				// opinion. This means that false will take precedence
--				// if there's any unready ports for a given endpoint.
--				ready[ep.IP] = true
+-	case k8s.Slices:
+-		for _, slice := range eps.SlicesVal {
+-			for _, ep := range slice.Endpoints {
+-				node := ep.Topology["kubernetes.io/hostname"]
+-				if filterNode(&node) {
+-					continue
+-				}
+-				for _, addr := range ep.Addresses {
+-					if _, ok := ready[addr]; !ok && k8s.IsConditionReady(ep.Conditions) {
+-						// Only set true if nothing else has expressed an
+-						// opinion. This means that false will take precedence
+-						// if there's any unready ports for a given endpoint.
+-						ready[addr] = true
+-					}
+-					if !k8s.IsConditionReady(ep.Conditions) {
+-						ready[addr] = false
+-					}
+-				}
 -			}
--		}
--		for _, ep := range subset.NotReadyAddresses {
--			ready[ep.IP] = false
-+	for _, ep := range eps.Ready {
 +		if _, ok := ready[ep.IP]; !ok {
 +			// Only set true if nothing else has expressed an
 +			// opinion. This means that false will take precedence
@@ -86,89 +85,135 @@ index 11f94fa7..b16622bb 100644
  
  	for _, r := range ready {
  		if r {
-@@ -137,7 +133,7 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
+@@ -137,7 +111,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
  	return false
  }
  
--func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *v1.Endpoints) string {
+-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps k8s.EpsOrSlices) string {
 +func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *Endpoints) string {
  	// Should we advertise?
  	// Yes, if externalTrafficPolicy is
  	//  Cluster && any healthy endpoint exists
 diff --git a/pkg/speaker/layer2_controller.go b/pkg/speaker/layer2_controller.go
-index 86e13b96..037ee641 100644
+index dd3b999a..037ee641 100644
 --- a/pkg/speaker/layer2_controller.go
 +++ b/pkg/speaker/layer2_controller.go
-@@ -41,21 +41,19 @@ func (c *Layer2Controller) SetConfig(log.Logger, *config.Config) error {
+@@ -22,7 +22,6 @@ import (
+ 
+ 	"github.com/go-kit/kit/log"
+ 	"go.universe.tf/metallb/pkg/config"
+-	"go.universe.tf/metallb/pkg/k8s"
+ 	"go.universe.tf/metallb/pkg/layer2"
+ 	v1 "k8s.io/api/core/v1"
+ )
+@@ -42,45 +41,20 @@ func (c *Layer2Controller) SetConfig(log.Logger, *config.Config) error {
  // The speakers parameter is a map with the node name as key and the readiness
  // status as value (true means ready, false means not ready).
  // If the speakers map is nil, it is ignored.
--func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
+-func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 +func usableNodes(eps *Endpoints, speakers map[string]bool) []string {
  	usable := map[string]bool{}
--	for _, subset := range eps.Subsets {
--		for _, ep := range subset.Addresses {
--			if ep.NodeName == nil {
+-	switch eps.Type {
+-	case k8s.Eps:
+-		for _, subset := range eps.EpVal.Subsets {
+-			for _, ep := range subset.Addresses {
+-				if ep.NodeName == nil {
+-					continue
+-				}
+-				if speakers != nil {
+-					if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
+-						continue
+-					}
+-				}
+-				if _, ok := usable[*ep.NodeName]; !ok {
+-					usable[*ep.NodeName] = true
+-				}
+-			}
 +	for _, ep := range eps.Ready {
 +		if ep.NodeName == nil {
 +			continue
-+		}
-+		if speakers != nil {
-+			if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
- 				continue
- 			}
--			if speakers != nil {
--				if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
+ 		}
+-	case k8s.Slices:
+-		for _, slice := range eps.SlicesVal {
+-			for _, ep := range slice.Endpoints {
+-				if !k8s.IsConditionReady(ep.Conditions) {
 -					continue
 -				}
--			}
--			if _, ok := usable[*ep.NodeName]; !ok {
--				usable[*ep.NodeName] = true
--			}
-+		}
+-				nodeName := ep.Topology["kubernetes.io/hostname"]
+-				if nodeName == "" {
+-					continue
+-				}
+-				if speakers != nil {
+-					if ready, ok := speakers[nodeName]; !ok || !ready {
+-						continue
+-					}
+-				}
+-				if _, ok := usable[nodeName]; !ok {
+-					usable[nodeName] = true
+-				}
++		if speakers != nil {
++			if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
++				continue
+ 			}
+ 		}
 +		if _, ok := usable[*ep.NodeName]; !ok {
 +			usable[*ep.NodeName] = true
- 		}
++		}
  	}
  
-@@ -69,7 +67,7 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
+ 	var ret []string
+@@ -93,7 +67,7 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
  	return ret
  }
  
--func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps *v1.Endpoints) string {
+-func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps k8s.EpsOrSlices) string {
 +func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps *Endpoints) string {
  	nodes := usableNodes(eps, c.SList.UsableSpeakers())
  	// Sort the slice by the hash of node + service name. This
  	// produces an ordering of ready nodes that is unique to this
 diff --git a/pkg/speaker/layer2_controller_test.go b/pkg/speaker/layer2_controller_test.go
-index 8d31227c..9ab982c6 100644
+index 35c1c600..0a4ad540 100644
 --- a/pkg/speaker/layer2_controller_test.go
 +++ b/pkg/speaker/layer2_controller_test.go
-@@ -170,7 +170,7 @@ func TestShouldAnnounce(t *testing.T) {
+@@ -1177,7 +1177,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  		balancer string
  		config   *config.Config
  		svcs     []*Service
--		eps      map[string]*v1.Endpoints
+-		eps      map[string]k8s.EpsOrSlices
 +		eps      map[string]*Endpoints
  
  		c1ExpectedResult map[string]string
  		c2ExpectedResult map[string]string
-@@ -193,20 +193,16 @@ func TestShouldAnnounce(t *testing.T) {
+@@ -1200,34 +1200,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Ingress:       statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 -				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -							},
 +			eps: map[string]*Endpoints{
@@ -183,23 +228,37 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris1"),
  						},
  					},
- 				},
-@@ -239,20 +235,16 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1261,34 +1243,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 -				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							NotReadyAddresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +			eps: map[string]*Endpoints{
@@ -214,23 +273,37 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris1"),
  						},
  					},
- 				},
-@@ -284,20 +276,16 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1321,34 +1285,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 -				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -							},
 +			eps: map[string]*Endpoints{
@@ -245,23 +318,37 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
-@@ -330,20 +318,16 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1382,34 +1328,16 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 -				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							NotReadyAddresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +			eps: map[string]*Endpoints{
@@ -276,25 +363,37 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
-@@ -376,22 +360,18 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1443,34 +1371,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 -				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
--							},
--							NotReadyAddresses: []v1.EndpointAddress{
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +			eps: map[string]*Endpoints{
@@ -311,24 +410,38 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
-@@ -431,36 +411,28 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1511,65 +1423,29 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.2"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 +			eps: map[string]*Endpoints{
  				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -341,18 +454,33 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
+ 					Type: k8s.Slices,
  				},
  				"10.20.30.2": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.35",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.35",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -							},
 +					NotReady: []Endpoint{
@@ -365,24 +493,38 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
-@@ -502,38 +474,30 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1612,65 +1488,31 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.2"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 +			eps: map[string]*Endpoints{
  				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -395,20 +537,33 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
+ 					Type: k8s.Slices,
  				},
  				"10.20.30.2": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
--							},
--							NotReadyAddresses: []v1.EndpointAddress{
 -								{
--									IP:       "2.3.4.35",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.35",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -423,26 +578,38 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
-@@ -575,40 +539,32 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1713,65 +1555,33 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.2"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 +			eps: map[string]*Endpoints{
  				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
--							},
--							NotReadyAddresses: []v1.EndpointAddress{
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -457,20 +624,33 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris1"),
  						},
  					},
+ 					Type: k8s.Slices,
  				},
  				"10.20.30.2": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
--							},
--							NotReadyAddresses: []v1.EndpointAddress{
 -								{
--									IP:       "2.3.4.35",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.35",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -485,28 +665,111 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
-@@ -643,24 +599,20 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1807,49 +1617,20 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 +			eps: map[string]*Endpoints{
  				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
+ 						},
+-						{
+-							Endpoints: []discovery.Endpoint{
+-								{
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
+-								},
+-							},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
++						},
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 					Type: k8s.Slices,
+@@ -1883,45 +1664,20 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]k8s.EpsOrSlices{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					SlicesVal: []*discovery.EndpointSlice{
+-						{
+-							Endpoints: []discovery.Endpoint{
+-								{
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
+-								},
+-								{
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -520,71 +783,52 @@ index 8d31227c..9ab982c6 100644
 +						},
 +						Endpoint{
 +							IP:       "2.3.4.25",
-+							NodeName: strptr("iris2"),
- 						},
- 					},
- 				},
-@@ -693,24 +645,20 @@ func TestShouldAnnounce(t *testing.T) {
- 					Status: statusAssigned("10.20.30.1"),
- 				},
- 			},
--			eps: map[string]*v1.Endpoints{
-+			eps: map[string]*Endpoints{
- 				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
--						{
--							Addresses: []v1.EndpointAddress{
--								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
--								},
--								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
--								},
--								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris1"),
--								},
--							},
-+					Ready: []Endpoint{
-+						Endpoint{
-+							IP:       "2.3.4.5",
-+							NodeName: strptr("iris1"),
-+						},
-+						Endpoint{
-+							IP:       "2.3.4.15",
-+							NodeName: strptr("iris2"),
-+						},
-+						Endpoint{
-+							IP:       "2.3.4.25",
 +							NodeName: strptr("iris1"),
  						},
  					},
- 				},
-@@ -743,26 +691,22 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -1955,45 +1711,22 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 +			eps: map[string]*Endpoints{
  				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
--							},
--							NotReadyAddresses: []v1.EndpointAddress{
 -								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -603,30 +847,49 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
-@@ -795,26 +739,22 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -2027,45 +1760,22 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 +			eps: map[string]*Endpoints{
  				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
--							},
--							NotReadyAddresses: []v1.EndpointAddress{
 -								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -645,30 +908,49 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris1"),
  						},
  					},
- 				},
-@@ -847,26 +787,22 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Type: k8s.Slices,
+@@ -2099,45 +1809,22 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
  					Status: statusAssigned("10.20.30.1"),
  				},
  			},
--			eps: map[string]*v1.Endpoints{
+-			eps: map[string]k8s.EpsOrSlices{
 +			eps: map[string]*Endpoints{
  				"10.20.30.1": {
--					Subsets: []v1.EndpointSubset{
+-					SlicesVal: []*discovery.EndpointSlice{
 -						{
--							Addresses: []v1.EndpointAddress{
+-							Endpoints: []discovery.Endpoint{
 -								{
--									IP:       "2.3.4.5",
--									NodeName: strptr("iris1"),
+-									Addresses: []string{
+-										"2.3.4.5",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris1",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(true),
+-									},
 -								},
--							},
--							NotReadyAddresses: []v1.EndpointAddress{
 -								{
--									IP:       "2.3.4.15",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.15",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -								{
--									IP:       "2.3.4.25",
--									NodeName: strptr("iris2"),
+-									Addresses: []string{
+-										"2.3.4.25",
+-									},
+-									Topology: map[string]string{
+-										"kubernetes.io/hostname": "iris2",
+-									},
+-									Conditions: discovery.EndpointConditions{
+-										Ready: boolPtr(false),
+-									},
 -								},
 -							},
 +					Ready: []Endpoint{
@@ -687,12 +969,12 @@ index 8d31227c..9ab982c6 100644
 +							NodeName: strptr("iris2"),
  						},
  					},
- 				},
+ 					Type: k8s.Slices,
 diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
-index 5c06ab15..a34acdd6 100644
+index cd5c0891..3c3d0443 100644
 --- a/pkg/speaker/speaker.go
 +++ b/pkg/speaker/speaker.go
-@@ -79,14 +79,14 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+@@ -80,14 +80,14 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
  		Type:          string(svc.Spec.Type),
  		TrafficPolicy: string(svc.Spec.ExternalTrafficPolicy),
  		Ingress:       svc.Status.LoadBalancer.Ingress,
@@ -704,12 +986,12 @@ index 5c06ab15..a34acdd6 100644
  	return s
  }
  
--func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *v1.Endpoints) types.SyncState {
+-func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps k8s.EpsOrSlices) types.SyncState {
 +func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *Endpoints) types.SyncState {
  	if svc == nil {
  		return c.deleteBalancer(l, name, "serviceDeleted")
  	}
-@@ -246,10 +246,43 @@ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
+@@ -247,10 +247,62 @@ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
  	return types.SyncStateSuccess
  }
  
@@ -719,23 +1001,42 @@ index 5c06ab15..a34acdd6 100644
 +	Ready, NotReady []Endpoint
 +}
 +
-+func toEndpoints(in *v1.Endpoints) *Endpoints {
-+	if in == nil {
-+		return nil
-+	}
++func toEndpoints(in k8s.EpsOrSlices) *Endpoints {
 +	out := new(Endpoints)
-+	for _, sub := range in.Subsets {
-+		for _, ep := range sub.Addresses {
-+			out.Ready = append(out.Ready, Endpoint{
-+				IP:       ep.IP,
-+				NodeName: ep.NodeName,
-+			})
++	switch in.Type {
++	case k8s.Eps:
++		for _, sub := range in.EpVal.Subsets {
++			for _, ep := range sub.Addresses {
++				out.Ready = append(out.Ready, Endpoint{
++					IP:       ep.IP,
++					NodeName: ep.NodeName,
++				})
++			}
++			for _, ep := range sub.NotReadyAddresses {
++				out.NotReady = append(out.NotReady, Endpoint{
++					IP:       ep.IP,
++					NodeName: ep.NodeName,
++				})
++			}
 +		}
-+		for _, ep := range sub.NotReadyAddresses {
-+			out.NotReady = append(out.NotReady, Endpoint{
-+				IP:       ep.IP,
-+				NodeName: ep.NodeName,
-+			})
++	case k8s.Slices:
++		for _, slice := range in.SlicesVal {
++			for _, ep := range slice.Endpoints {
++				node := ep.Topology["kubernetes.io/hostname"]
++				for _, addr := range ep.Addresses {
++					if k8s.IsConditionReady(ep.Conditions) {
++						out.Ready = append(out.Ready, Endpoint{
++							IP:       addr,
++							NodeName: &node,
++						})
++					} else {
++						out.NotReady = append(out.NotReady, Endpoint{
++							IP:       addr,
++							NodeName: &node,
++						})
++					}
++				}
++			}
 +		}
 +	}
 +	return out
@@ -749,7 +1050,7 @@ index 5c06ab15..a34acdd6 100644
  // A Protocol can advertise an IP address.
  type Protocol interface {
  	SetConfig(gokitlog.Logger, *config.Config) error
--	ShouldAnnounce(gokitlog.Logger, string, string, *v1.Endpoints) string
+-	ShouldAnnounce(gokitlog.Logger, string, string, k8s.EpsOrSlices) string
 +	ShouldAnnounce(gokitlog.Logger, string, string, *Endpoints) string
  	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
  	DeleteBalancer(gokitlog.Logger, string, string) error

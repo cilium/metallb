@@ -1,4 +1,4 @@
-From 310946fff4b47c0bea1fec76c708895d4f243f62 Mon Sep 17 00:00:00 2001
+From e109ac0d2247d7a14eb9c43380db25dd216e7e2e Mon Sep 17 00:00:00 2001
 From: Chris Tarazi <chris@isovalent.com>
 Date: Tue, 9 Mar 2021 15:01:43 -0800
 Subject: [PATCH 09/10] speaker: Provide alternative to SetNode()
@@ -16,10 +16,10 @@ Signed-off-by: Chris Tarazi <chris@isovalent.com>
  3 files changed, 11 insertions(+), 9 deletions(-)
 
 diff --git a/pkg/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
-index b16622bb..987eb424 100644
+index 0da1d4af..d369c6cb 100644
 --- a/pkg/speaker/bgp_controller.go
 +++ b/pkg/speaker/bgp_controller.go
-@@ -266,12 +266,11 @@ type session interface {
+@@ -251,12 +251,11 @@ type session interface {
  	Set(advs ...*bgp.Advertisement) error
  }
  
@@ -58,10 +58,10 @@ index 037ee641..3ab29fde 100644
  	return nil
  }
 diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
-index a34acdd6..13f7dc87 100644
+index 3c3d0443..55190b6d 100644
 --- a/pkg/speaker/speaker.go
 +++ b/pkg/speaker/speaker.go
-@@ -237,8 +237,12 @@ func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) types.Sync
+@@ -238,8 +238,12 @@ func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) types.Sync
  }
  
  func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
@@ -75,7 +75,7 @@ index a34acdd6..13f7dc87 100644
  			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
  			return types.SyncStateError
  		}
-@@ -285,7 +289,7 @@ type Protocol interface {
+@@ -305,7 +309,7 @@ type Protocol interface {
  	ShouldAnnounce(gokitlog.Logger, string, string, *Endpoints) string
  	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
  	DeleteBalancer(gokitlog.Logger, string, string) error
