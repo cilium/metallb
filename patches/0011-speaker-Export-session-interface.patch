@@ -1,0 +1,60 @@
+From 4085820736c629bee184fa128f8e2af9be77b6b2 Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Fri, 9 Apr 2021 13:45:42 -0700
+Subject: [PATCH 1/2] speaker: Export session interface
+
+In the next commit, this interface will be used by outside modules.
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ pkg/speaker/bgp_controller.go      | 7 ++++---
+ pkg/speaker/bgp_controller_test.go | 2 +-
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/pkg/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
+index d369c6cb..e075381d 100644
+--- a/pkg/speaker/bgp_controller.go
++++ b/pkg/speaker/bgp_controller.go
+@@ -34,7 +34,7 @@ import (
+ 
+ type peer struct {
+ 	cfg *config.Peer
+-	bgp session
++	bgp Session
+ }
+ 
+ type BGPController struct {
+@@ -246,7 +246,8 @@ func (c *BGPController) DeleteBalancer(l log.Logger, name, reason string) error
+ 	return c.updateAds()
+ }
+ 
+-type session interface {
++// Session gives access to the BGP session.
++type Session interface {
+ 	io.Closer
+ 	Set(advs ...*bgp.Advertisement) error
+ }
+@@ -265,6 +266,6 @@ func (c *BGPController) SetNodeLabels(l log.Logger, lbls map[string]string) erro
+ 	return c.syncPeers(l)
+ }
+ 
+-var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (session, error) {
++var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (Session, error) {
+ 	return bgp.New(logger, addr, myASN, routerID, asn, hold, password, myNode)
+ }
+diff --git a/pkg/speaker/bgp_controller_test.go b/pkg/speaker/bgp_controller_test.go
+index 587f059e..f89d1b84 100644
+--- a/pkg/speaker/bgp_controller_test.go
++++ b/pkg/speaker/bgp_controller_test.go
+@@ -92,7 +92,7 @@ type fakeBGP struct {
+ 	gotAds map[string][]*bgp.Advertisement
+ }
+ 
+-func (f *fakeBGP) New(_ log.Logger, addr string, _ uint32, _ net.IP, _ uint32, _ time.Duration, _, _ string) (session, error) {
++func (f *fakeBGP) New(_ log.Logger, addr string, _ uint32, _ net.IP, _ uint32, _ time.Duration, _, _ string) (Session, error) {
+ 	f.Lock()
+ 	defer f.Unlock()
+ 
+-- 
+2.31.1
+
