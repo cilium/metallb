@@ -217,7 +217,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -294,7 +294,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -325,7 +325,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Local",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -352,7 +352,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Local",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -387,7 +387,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Local",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -432,7 +432,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -448,7 +448,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -475,7 +475,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -537,7 +537,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -597,7 +597,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test1",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -633,7 +633,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test2",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
@@ -668,7 +668,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test2",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.5"),
@@ -710,7 +710,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test2",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),
@@ -790,7 +790,7 @@ func TestBGPSpeaker(t *testing.T) {
 			balancer: "test2",
 			svc: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					ExternalTrafficPolicy: "Cluster",
 				},
 				Status: statusAssigned("10.20.30.1"),

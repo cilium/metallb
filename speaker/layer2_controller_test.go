@@ -189,7 +189,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -235,7 +235,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -280,7 +280,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -326,7 +326,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -372,7 +372,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -420,14 +420,14 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.2"),
@@ -491,14 +491,14 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.2"),
@@ -564,14 +564,14 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.2"),
@@ -639,7 +639,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -689,7 +689,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -739,7 +739,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -791,7 +791,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
@@ -843,7 +843,7 @@ func TestShouldAnnounce(t *testing.T) {
 			svcs: []*v1.Service{
 				{
 					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
+						Type:                  v1.ServiceTypeLoadBalancer,
 						ExternalTrafficPolicy: "Cluster",
 					},
 					Status: statusAssigned("10.20.30.1"),
