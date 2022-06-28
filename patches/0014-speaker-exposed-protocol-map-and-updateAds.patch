@@ -1,0 +1,131 @@
+From 1f60b3104c91b4a63a90191334f62e4f09a24264 Mon Sep 17 00:00:00 2001
+From: Dylan Reimerink <dylan.reimerink@isovalent.com>
+Date: Tue, 28 Jun 2022 13:32:43 +0200
+Subject: [PATCH] Speaker: exposed protocol map and `BGPController.UpdateAds`
+
+Made the `Controller.protocol` map which holds the BGPController
+exported, so we can access BGPController directly from outside the
+package. This allows us to update the `SvcAds` on the BGPController.
+Also exported the `updateAds` function which will sync the `SvcAds` to
+the sessions.
+
+These two combined allow us to implement PodCIDR announcement at the
+BGPController level instead of the session level so it doesn't conflict
+with other announcements such as for loadbalancers.
+
+Signed-off-by: Dylan Reimerink <dylan.reimerink@isovalent.com>
+---
+ pkg/speaker/bgp_controller.go |  8 ++++----
+ pkg/speaker/speaker.go        | 14 +++++++-------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/pkg/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
+index c4601a5f..16c6411e 100644
+--- a/pkg/speaker/bgp_controller.go
++++ b/pkg/speaker/bgp_controller.go
+@@ -178,7 +178,7 @@ func (c *BGPController) syncPeers(l log.Logger) error {
+ 	}
+ 	if needUpdateAds {
+ 		// Some new sessions came up, resync advertisement state.
+-		if err := c.updateAds(); err != nil {
++		if err := c.UpdateAds(); err != nil {
+ 			l.Log("op", "updateAds", "error", err, "msg", "failed to update BGP advertisements")
+ 			return err
+ 		}
+@@ -207,7 +207,7 @@ func (c *BGPController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
+ 		c.SvcAds[name] = append(c.SvcAds[name], ad)
+ 	}
+ 
+-	if err := c.updateAds(); err != nil {
++	if err := c.UpdateAds(); err != nil {
+ 		return err
+ 	}
+ 
+@@ -216,7 +216,7 @@ func (c *BGPController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
+ 	return nil
+ }
+ 
+-func (c *BGPController) updateAds() error {
++func (c *BGPController) UpdateAds() error {
+ 	var allAds []*bgp.Advertisement
+ 	for _, ads := range c.SvcAds {
+ 		// This list might contain duplicates, but that's fine,
+@@ -243,7 +243,7 @@ func (c *BGPController) DeleteBalancer(l log.Logger, name, reason string) error
+ 		return nil
+ 	}
+ 	delete(c.SvcAds, name)
+-	return c.updateAds()
++	return c.UpdateAds()
+ }
+ 
+ // Session gives access to the BGP session.
+diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
+index 5d384dfb..a04473b5 100644
+--- a/pkg/speaker/speaker.go
++++ b/pkg/speaker/speaker.go
+@@ -38,7 +38,7 @@ func NewController(cfg ControllerConfig) (*Controller, error) {
+ 
+ 	ret := &Controller{
+ 		myNode:    cfg.MyNode,
+-		protocols: protocols,
++		Protocols: protocols,
+ 		announced: map[string]config.Proto{},
+ 		svcIP:     map[string]net.IP{},
+ 	}
+@@ -52,7 +52,7 @@ type Controller struct {
+ 	config *config.Config
+ 	Client service
+ 
+-	protocols map[config.Proto]Protocol
++	Protocols map[config.Proto]Protocol
+ 	announced map[string]config.Proto // service name -> protocol advertising it
+ 	svcIP     map[string]net.IP       // service name -> assigned IP
+ }
+@@ -142,7 +142,7 @@ func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, ep
+ 	}
+ 
+ 	l = gokitlog.With(l, "protocol", pool.Protocol)
+-	handler := c.protocols[pool.Protocol]
++	handler := c.Protocols[pool.Protocol]
+ 	if handler == nil {
+ 		l.Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
+ 		return c.deleteBalancer(l, name, "internalError")
+@@ -179,7 +179,7 @@ func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) type
+ 		return types.SyncStateSuccess
+ 	}
+ 
+-	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
++	if err := c.Protocols[proto].DeleteBalancer(l, name, reason); err != nil {
+ 		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
+ 		return types.SyncStateError
+ 	}
+@@ -225,7 +225,7 @@ func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) types.Sync
+ 		}
+ 	}
+ 
+-	for proto, handler := range c.protocols {
++	for proto, handler := range c.Protocols {
+ 		if err := handler.SetConfig(l, cfg); err != nil {
+ 			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
+ 			return types.SyncStateError
+@@ -242,7 +242,7 @@ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
+ }
+ 
+ func (c *Controller) SetNodeLabels(l gokitlog.Logger, labels map[string]string) types.SyncState {
+-	for proto, handler := range c.protocols {
++	for proto, handler := range c.Protocols {
+ 		if err := handler.SetNodeLabels(l, labels); err != nil {
+ 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
+ 			return types.SyncStateError
+@@ -254,7 +254,7 @@ func (c *Controller) SetNodeLabels(l gokitlog.Logger, labels map[string]string)
+ // PeerSessions returns the underlying BGP sessions from the BGP controller. In
+ // Layer2 mode only, this returns nil.
+ func (c *Controller) PeerSessions() []Session {
+-	if handler, ok := c.protocols[config.BGP]; ok {
++	if handler, ok := c.Protocols[config.BGP]; ok {
+ 		return handler.(*BGPController).PeerSessions()
+ 	}
+ 	return nil
+-- 
+2.35.1
+
