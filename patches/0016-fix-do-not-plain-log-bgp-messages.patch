@@ -1,0 +1,25 @@
+From 098fbaa1db424e12bf78ad4f6f80b86a8e8e32ec Mon Sep 17 00:00:00 2001
+From: Louis DeLosSantos <louis.delos@isovalent.com>
+Date: Thu, 25 Aug 2022 21:42:36 -0400
+Subject: [PATCH] fix: do not plain log bgp messages
+
+Signed-off-by: Louis DeLosSantos <louis.delos@isovalent.com>
+---
+ pkg/bgp/messages.go | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/pkg/bgp/messages.go b/pkg/bgp/messages.go
+index 7b5d344e..531536a2 100644
+--- a/pkg/bgp/messages.go
++++ b/pkg/bgp/messages.go
+@@ -190,7 +190,6 @@ func readOpen(r io.Reader) (*openResult, error) {
+ 	if err := binary.Read(lr, binary.BigEndian, &open); err != nil {
+ 		return nil, err
+ 	}
+-	fmt.Printf("%#v\n", open)
+ 	if open.Version != 4 {
+ 		return nil, fmt.Errorf("wrong BGP version")
+ 	}
+-- 
+2.37.2
+
