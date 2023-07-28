@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 
 	"github.com/go-kit/kit/log"
 	"github.com/mdlayher/ndp"
@@ -131,8 +132,12 @@ func (n *ndpResponder) processRequest() dropReason {
 		return dropReasonNoSourceLL
 	}
 
+	addr, err := netip.ParseAddr(ns.TargetAddress.String())
+	if err != nil {
+		return dropReasonError
+	}
 	// Ignore NDP requests that the announcer tells us to ignore.
-	if reason := n.announce(ns.TargetAddress); reason != dropReasonNone {
+	if reason := n.announce(addr); reason != dropReasonNone {
 		return reason
 	}
 

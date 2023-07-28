@@ -3,6 +3,7 @@ package layer2
 import (
 	"io/ioutil"
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"sync"
@@ -188,7 +189,11 @@ func (a *Announce) gratuitous(ip net.IP) error {
 	}
 	if ip.To4() != nil {
 		for _, client := range a.arps {
-			if err := client.Gratuitous(ip); err != nil {
+			ipAddr, err := netip.ParseAddr(ip.String())
+			if err != nil {
+				return err
+			}
+			if err := client.Gratuitous(ipAddr); err != nil {
 				return err
 			}
 		}
@@ -202,11 +207,15 @@ func (a *Announce) gratuitous(ip net.IP) error {
 	return nil
 }
 
-func (a *Announce) shouldAnnounce(ip net.IP) dropReason {
+func (a *Announce) shouldAnnounce(ip netip.Addr) dropReason {
 	a.RLock()
 	defer a.RUnlock()
 	for _, i := range a.ips {
-		if i.Equal(ip) {
+		ipAddr, err := netip.ParseAddr(i.String())
+		if err != nil {
+			return dropReasonError
+		}
+		if ipAddr == ip {
 			return dropReasonNone
 		}
 	}
