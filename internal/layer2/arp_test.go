@@ -147,17 +147,20 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 	// which one, we just need something to satisfy the various
 	// interfaces.
 	var a *arpResponder
+	validInterfaceFound := false
 	for _, intf := range intfs {
 		if intf.HardwareAddr == nil {
 			continue
 		}
-
 		var c *arp.Client
 		c, err = arp.New(&intf, pc)
 		if err != nil {
-			t.Fatalf("failed to create ARP client: %s", err)
+			// continue with other interfaces and ignore the error as the validInterfaceFound check would
+			// eventually throw an error
+			continue
 		}
 
+		validInterfaceFound = true
 		a = &arpResponder{
 			logger:       log.NewNopLogger(),
 			hardwareAddr: intf.HardwareAddr,
@@ -166,7 +169,9 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 			announce:     shouldAnnounce,
 		}
 	}
-
+	if validInterfaceFound == false {
+		t.Fatal("Failed to find an interface with a valid hardware address.")
+	}
 	uc, err := net.DialUDP("udp", nil, pc.LocalAddr().(*net.UDPAddr))
 	if err != nil {
 		t.Fatalf("failed to dial UDP: %s", err)
