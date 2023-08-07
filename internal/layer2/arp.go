@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 
 	"github.com/go-kit/kit/log"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
 )
 
-type announceFunc func(net.IP) dropReason
+type announceFunc func(netip.Addr) dropReason
 
 type arpResponder struct {
 	logger       log.Logger
@@ -47,7 +48,7 @@ func (a *arpResponder) Close() error {
 	return a.conn.Close()
 }
 
-func (a *arpResponder) Gratuitous(ip net.IP) error {
+func (a *arpResponder) Gratuitous(ip netip.Addr) error {
 	for _, op := range []arp.Operation{arp.OperationRequest, arp.OperationReply} {
 		pkt, err := arp.NewPacket(op, a.hardwareAddr, ip, ethernet.Broadcast, ip)
 		if err != nil {

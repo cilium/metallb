@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"fmt"
 	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/go-kit/kit/log"
@@ -16,7 +17,7 @@ func TestARPResponder(t *testing.T) {
 	tests := []struct {
 		name           string
 		dstMAC         net.HardwareAddr
-		arpTgt         net.IP
+		arpTgt         netip.Addr
 		arpOp          arp.Operation
 		shouldAnnounce announceFunc
 		reason         dropReason
@@ -42,8 +43,8 @@ func TestARPResponder(t *testing.T) {
 		},
 		{
 			name: "shouldAnnounce denies request",
-			shouldAnnounce: func(ip net.IP) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			shouldAnnounce: func(ip netip.Addr) dropReason {
+				if netip.MustParseAddr("192.168.1.20") == ip {
 					return dropReasonNone
 				}
 				return dropReasonError
@@ -52,9 +53,9 @@ func TestARPResponder(t *testing.T) {
 		},
 		{
 			name:   "shouldAnnounce allows request",
-			arpTgt: net.IPv4(192, 168, 1, 20),
-			shouldAnnounce: func(ip net.IP) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			arpTgt: netip.MustParseAddr("192.168.1.20"),
+			shouldAnnounce: func(ip netip.Addr) dropReason {
+				if netip.MustParseAddr("192.168.1.20") == ip {
 					return dropReasonNone
 				}
 				return dropReasonError
@@ -67,7 +68,7 @@ func TestARPResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shouldAnnounce := tt.shouldAnnounce
 			if shouldAnnounce == nil {
-				shouldAnnounce = func(net.IP) dropReason {
+				shouldAnnounce = func(netip.Addr) dropReason {
 					return dropReasonNone
 				}
 			}
@@ -78,8 +79,9 @@ func TestARPResponder(t *testing.T) {
 			if tt.dstMAC == nil {
 				tt.dstMAC = a.hardwareAddr
 			}
-			if tt.arpTgt == nil {
-				tt.arpTgt = net.IPv4(192, 168, 1, 10)
+			if !tt.arpTgt.IsValid() { // TODO: compare to nil before PR
+				ipAddr := netip.MustParseAddr("192.168.1.10")
+				tt.arpTgt = ipAddr
 			}
 			if tt.arpOp == 0 {
 				tt.arpOp = arp.OperationRequest
@@ -90,7 +92,8 @@ func TestARPResponder(t *testing.T) {
 				Source:      net.HardwareAddr{1, 2, 3, 4, 5, 6},
 				EtherType:   ethernet.EtherTypeARP,
 			}
-			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, net.IPv4(192, 168, 1, 1), tt.dstMAC, tt.arpTgt)
+			ipAddr := netip.MustParseAddr("192.168.1.1")
+			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, ipAddr, tt.dstMAC, tt.arpTgt)
 			if err != nil {
 				t.Fatalf("failed to make ARP packet: %s", err)
 			}
@@ -144,17 +147,20 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 	// which one, we just need something to satisfy the various
 	// interfaces.
 	var a *arpResponder
+	validInterfaceFound := false
 	for _, intf := range intfs {
 		if intf.HardwareAddr == nil {
 			continue
 		}
-
 		var c *arp.Client
 		c, err = arp.New(&intf, pc)
 		if err != nil {
-			t.Fatalf("failed to create ARP client: %s", err)
+			// continue with other interfaces and ignore the error as the validInterfaceFound check would
+			// eventually throw an error
+			continue
 		}
 
+		validInterfaceFound = true
 		a = &arpResponder{
 			logger:       log.NewNopLogger(),
 			hardwareAddr: intf.HardwareAddr,
@@ -163,7 +169,9 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 			announce:     shouldAnnounce,
 		}
 	}
-
+	if validInterfaceFound == false {
+		t.Fatal("Failed to find an interface with a valid hardware address.")
+	}
 	uc, err := net.DialUDP("udp", nil, pc.LocalAddr().(*net.UDPAddr))
 	if err != nil {
 		t.Fatalf("failed to dial UDP: %s", err)
