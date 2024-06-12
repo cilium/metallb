@@ -29,7 +29,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 	// Not a LoadBalancer, early exit. It might have been a balancer
 	// in the past, so we still need to clear LB state.
-	if svc.Spec.Type != "LoadBalancer" {
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
 		l.Log("event", "clearAssignment", "reason", "notLoadBalancer", "msg", "not a LoadBalancer")
 		c.clearServiceState(key, svc)
 		// Early return, we explicitly do *not* want to reallocate

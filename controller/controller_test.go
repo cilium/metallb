@@ -171,14 +171,14 @@ func TestControllerMutation(t *testing.T) {
 			desc: "simple LoadBalancer",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
@@ -189,14 +189,14 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP:      "1.2.3.4",
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "1.2.3.1",
 				},
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP:      "1.2.3.4",
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "1.2.3.1",
 				},
 				Status: statusAssigned("1.2.3.1"),
@@ -207,7 +207,7 @@ func TestControllerMutation(t *testing.T) {
 			desc: "request invalid IP",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "please sir may I have an IP address thank you",
 					ClusterIP:      "1.2.3.4",
 				},
@@ -219,7 +219,7 @@ func TestControllerMutation(t *testing.T) {
 			desc: "request infeasible IP",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "1.2.3.4",
 					ClusterIP:      "1.2.3.4",
 				},
@@ -227,7 +227,7 @@ func TestControllerMutation(t *testing.T) {
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "1.2.3.4",
 					ClusterIP:      "1.2.3.4",
 				},
@@ -244,7 +244,7 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 			},
@@ -255,7 +255,7 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.0"),
@@ -272,7 +272,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
@@ -284,7 +284,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 				},
 				Status: statusAssigned("3.4.5.6"),
 			},
@@ -300,7 +300,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 				},
 			},
 			wantErr: true,
@@ -310,14 +310,14 @@ func TestControllerMutation(t *testing.T) {
 			desc: "invalid IP assigned",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("2.3.4.5"),
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.0"),
@@ -328,7 +328,7 @@ func TestControllerMutation(t *testing.T) {
 			desc: "invalid ingress state",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 				Status: v1.ServiceStatus{
@@ -346,7 +346,7 @@ func TestControllerMutation(t *testing.T) {
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.0"),
@@ -374,14 +374,14 @@ func TestControllerMutation(t *testing.T) {
 			desc: "request layer2 service",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "3.4.5.6",
 					ClusterIP:      "1.2.3.4",
 				},
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "3.4.5.6",
 					ClusterIP:      "1.2.3.4",
 				},
@@ -393,7 +393,7 @@ func TestControllerMutation(t *testing.T) {
 			desc: "Layer2 service with local traffic policy",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP:        "3.4.5.6",
 					ExternalTrafficPolicy: "Local",
 					ClusterIP:             "1.2.3.4",
@@ -401,7 +401,7 @@ func TestControllerMutation(t *testing.T) {
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
+					Type:                  v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP:        "3.4.5.6",
 					ExternalTrafficPolicy: "Local",
 					ClusterIP:             "1.2.3.4",
@@ -414,7 +414,7 @@ func TestControllerMutation(t *testing.T) {
 			desc: "No ClusterIP",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
 			wantErr: false,
@@ -424,7 +424,7 @@ func TestControllerMutation(t *testing.T) {
 			desc: "request IP from wrong ip-family (ipv4)",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "1.2.3.1",
 					ClusterIP:      "3000::1",
 				},
@@ -436,7 +436,7 @@ func TestControllerMutation(t *testing.T) {
 			desc: "request IP from wrong ip-family (ipv6)",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:           "LoadBalancer",
+					Type:           v1.ServiceTypeLoadBalancer,
 					LoadBalancerIP: "1000::",
 					ClusterIP:      "1.2.3.4",
 				},
@@ -448,14 +448,14 @@ func TestControllerMutation(t *testing.T) {
 			desc: "IP from wrong ip-family (ipv6) assigned",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1000::"),
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.0"),
@@ -466,14 +466,14 @@ func TestControllerMutation(t *testing.T) {
 			desc: "IP from wrong ip-family (ipv4) assigned",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "3000::1",
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:      "LoadBalancer",
+					Type:      v1.ServiceTypeLoadBalancer,
 					ClusterIP: "3000::1",
 				},
 				Status: statusAssigned("1000::"),
@@ -545,7 +545,7 @@ func TestControllerConfig(t *testing.T) {
 	l := log.NewNopLogger()
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type:      "LoadBalancer",
+			Type:      v1.ServiceTypeLoadBalancer,
 			ClusterIP: "1.2.3.4",
 		},
 	}
@@ -652,7 +652,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 
 	svc1 := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type:      "LoadBalancer",
+			Type:      v1.ServiceTypeLoadBalancer,
 			ClusterIP: "1.2.3.4",
 		},
 	}
@@ -672,7 +672,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	// IP because we have none left.
 	svc2 := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type:      "LoadBalancer",
+			Type:      v1.ServiceTypeLoadBalancer,
 			ClusterIP: "1.2.3.4",
 		},
 	}

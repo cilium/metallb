@@ -199,7 +199,7 @@ func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
 
-	if svc.Spec.Type != "LoadBalancer" {
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
 		return c.deleteBalancer(l, name, "notLoadBalancer")
 	}
 
